@@ -14,22 +14,31 @@ class RNN_Model(object):
 
     def __init__(self, config, is_training=True):
 
+        if is_training:
+            batch_size = config.train_batch_size
+        else:
+            batch_size = config.test_batch_size
+
         self.mask = tf.placeholder(dtype=tf.float64, shape=[None])
 
-        self.sequence_length = tf.placeholder(dtype=tf.int32, shape=[config.batch_size])
+        self.sequence_length = tf.placeholder(dtype=tf.int32, shape=[batch_size])
 
-        self.input_data = tf.placeholder(dtype=tf.float64, shape=[config.batch_size, None, config.input_dimension])
-        self.targets = tf.placeholder(dtype=tf.int32, shape=[config.batch_size, None])
+        self.input_data = tf.placeholder(dtype=tf.float64, shape=[batch_size, None, config.input_dimension])
+        self.targets = tf.placeholder(dtype=tf.int32, shape=[batch_size, None])
 
-        lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(config.hidden_neural_size,
-                                                 forget_bias=0.0, state_is_tuple=True,
-                                                 reuse=not is_training)
+        lstm_cell_one = tf.nn.rnn_cell.BasicLSTMCell(config.hidden_neural_size, forget_bias=1.0, state_is_tuple=True,
+                                                     reuse=not is_training)
+
+        """lstm_cell_two = tf.nn.rnn_cell.BasicLSTMCell(config.hidden_neural_size,
+                        forget_bias=1.0, state_is_tuple=True,
+                        reuse=not is_training)"""
         if is_training:
-            lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, output_keep_prob=config.keep_prob)
+            lstm_cell_one = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell_one, output_keep_prob=config.keep_prob)
 
-        multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell]*config.num_layers, state_is_tuple=True)
+            """lstm_cell_two = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell_two, output_keep_prob=config.keep_prob)"""
+        multi_rnn_cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell_one]*2, state_is_tuple=True)
 
-        self.initial_state = multi_rnn_cell.zero_state(config.batch_size, dtype=tf.float64)
+        self.initial_state = multi_rnn_cell.zero_state(batch_size, dtype=tf.float64)
 
         with tf.name_scope("LSTM_layer"):
             outputs, last_states = tf.nn.dynamic_rnn(
@@ -54,8 +63,15 @@ class RNN_Model(object):
                 [tf.reshape(self.targets, [-1])],
                 [self.mask]
             )
-            self.cost_batch = tf.reduce_sum(self.loss) / config.batch_size
+            self.cost_batch = tf.reduce_sum(self.loss) / batch_size
             self.cost_all = tf.reduce_sum(self.loss)
+
+        with tf.name_scope("accuracy"):
+            self.prediction = tf.argmax(self.logits, 1)
+            correct_prediction = (tf.cast(tf.equal(self.prediction, tf.to_int64(tf.reshape(self.targets, [-1]))),
+                                          tf.float64)) * self.mask
+            self.correct_num = tf.reduce_sum(correct_prediction)
+            self.accuracy = self.correct_num / tf.reduce_sum(self.mask)
 
         if not is_training:
             return
@@ -63,7 +79,7 @@ class RNN_Model(object):
         trainable_variables = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost_batch, trainable_variables), config.max_grad_norm)
 
-        optimizer = tf.train.GradientDescentOptimizer(config.learning_rate)
+        optimizer = tf.train.AdamOptimizer(config.learning_rate)
         self.train_op = optimizer.apply_gradients(zip(grads, trainable_variables))
 
         # keep track of gradient values

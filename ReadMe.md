@@ -4,9 +4,9 @@
 
 ---
 
-### new_data
+### data
 
-处理后的数据存放在new_data目录，但是由于数据量超过github限制，因此无法上传。读者可自行处理数据。
+处理后的数据存放在data目录，但是由于数据量超过github限制，因此无法上传。
 
 原始数据与处理后的数据相比
 
@@ -25,19 +25,13 @@ LSTM + DNN + Softmax
 
 - 使用pandas对数据预处理，处理后的数据保存在new_data目录中，原始数据在data目录中
 - 实现对数据的batch读取
-- 只使用train data进行训练（仅仅跑通网络），并未用到valid data和test data
-
----
-
-### will do
-
-- 由于没有test label，决定从原始的train data分出valid data和test data
+- 将原始数据分为train data 与 test data
 
 ---
 
 ### how to run
 
-> enter main directory，then execute python train_rnn.py
+> enter main directory，then execute **python train_rnn.py**
 
 
 
